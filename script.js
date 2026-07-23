@@ -165,10 +165,11 @@ if('IntersectionObserver' in window){
   sections.forEach(function(section){ navObserver.observe(section); });
 })();
 
-// hero: mesh de gradiente + spotlight reagem sutilmente ao mouse
+// hero: mesh de gradiente + spotlight + cards de ferramentas reagem sutilmente ao mouse
 (function(){
   var hero = document.querySelector('.hero-dark');
   var mesh = hero && hero.querySelector('.hero-mesh');
+  var scene = hero && hero.querySelector('.tool-scene');
   if(!hero || !mesh) return;
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if(window.matchMedia('(pointer: coarse)').matches) return;
@@ -184,10 +185,20 @@ if('IntersectionObserver' in window){
       mesh.style.transform = 'translate(' + (x * 24).toFixed(1) + 'px,' + (y * 24).toFixed(1) + 'px)';
       hero.style.setProperty('--mx', ((x + 0.5) * 100).toFixed(1) + '%');
       hero.style.setProperty('--my', ((y + 0.5) * 100).toFixed(1) + '%');
+      if(scene){
+        // opposite direction from the mesh, smaller range — a nearer
+        // layer drifting against the background gives a light 3D parallax
+        scene.style.setProperty('--tx', (x * -16).toFixed(1) + 'px');
+        scene.style.setProperty('--ty', (y * -16).toFixed(1) + 'px');
+      }
       rafPending = false;
     });
   });
   hero.addEventListener('pointerleave', function(){
     mesh.style.transform = 'translate(0,0)';
+    if(scene){
+      scene.style.setProperty('--tx', '0px');
+      scene.style.setProperty('--ty', '0px');
+    }
   });
 })();
