@@ -272,9 +272,9 @@
   .tool-icon{
     width:44px;height:44px;border-radius:12px;flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;
-    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;
     background:rgba(185,131,255,0.16);color:var(--accent);
   }
+  .tool-icon img{width:26px;height:26px;object-fit:contain;}
   .tool-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);white-space:nowrap;}
 
   @media(max-width:1000px){
