@@ -224,83 +224,66 @@
   }
   .hero-dark:hover .hero-spotlight{opacity:1;}
 
-  /* Esteira de ferramentas desativada temporariamente - remover esta regra para reativar */
-  .tool-cards{display:none !important;}
-
   /* right-side hero composition: two columns of tool cards drifting past
-     each other (one up, one down) inside a tilted 3D "scene" — the tracks
-     themselves only translateY, the diagonal look comes purely from the
-     scene's own perspective/rotate transform, so the motion never fights
-     the text block */
+     each other (one up, one down) inside a tilted 3D "scene" — cards only
+     ever translateY (driven by JS, see script.js), the diagonal look comes
+     purely from the scene's own perspective/rotate transform, so the
+     motion never fights the text block */
   .tool-cards{
-    position:absolute;top:0;bottom:0;right:0;width:44%;z-index:0;pointer-events:auto;overflow:hidden;
+    position:absolute;top:-220px;bottom:-80px;right:-310px;width:calc(52% + 220px);
+    z-index:0;pointer-events:none;overflow:hidden;
     mask-image:
-      linear-gradient(90deg,transparent 0%,#000 38%),
-      linear-gradient(to bottom,transparent 0%,#000 14%,#000 86%,transparent 100%);
+      linear-gradient(90deg,transparent 0,transparent 200px,#000 320px),
+      linear-gradient(to bottom,transparent 0,transparent 200px,#000 300px,#000 84%,transparent 100%);
     mask-composite:intersect;
     -webkit-mask-image:
-      linear-gradient(90deg,transparent 0%,#000 38%),
-      linear-gradient(to bottom,transparent 0%,#000 14%,#000 86%,transparent 100%);
+      linear-gradient(90deg,transparent 0,transparent 200px,#000 320px),
+      linear-gradient(to bottom,transparent 0,transparent 200px,#000 300px,#000 84%,transparent 100%);
     -webkit-mask-composite:source-in;
   }
   .tool-scene{
-    width:100%;height:100%;display:flex;gap:16px;padding:0 12px;
+    width:100%;height:100%;display:flex;gap:20px;padding:0 12px 0 300px;
     transform-style:preserve-3d;transform-origin:50% 40%;
-    transform:perspective(1000px) rotateX(35deg) rotate(15deg) translate(var(--tx,0px),var(--ty,0px));
-    transition:transform .35s ease-out;
+    transform:perspective(1000px) rotateX(35deg) rotate(15deg);
   }
-  .tool-col{flex-shrink:0;width:118px;height:140%;position:relative;overflow:hidden;}
-  .tool-track{display:flex;flex-direction:column;gap:16px;position:absolute;left:0;right:0;top:0;}
-  .tool-track--up{margin-top:-20%;animation:trackUp 20s linear infinite;}
-  .tool-track--down{margin-top:-45%;animation:trackDown 24s linear infinite;}
-  @keyframes trackUp{from{transform:translateY(0);}to{transform:translateY(-50%);}}
-  @keyframes trackDown{from{transform:translateY(-50%);}to{transform:translateY(0);}}
-
-  /* pause the belt when the user hovers so they can read a card if they want */
-  .tool-cards:hover .tool-track--up,
-  .tool-cards:hover .tool-track--down{animation-play-state:paused;}
-
-  /* entrance: each card fades/slides in on its own, staggered by --i */
+  .tool-col{flex-shrink:0;width:150px;height:140%;position:relative;overflow:hidden;}
+  /* a trilha não usa mais @keyframes: as posições de cada card são
+     calculadas quadro a quadro em JS (ver script.js) e recicladas assim
+     que saem da área visível — isso evita por completo o "salto" do
+     wrap-around de uma animação CSS em loop, porque nenhum card jamais
+     precisa pular de volta ao topo/fim: ele simplesmente reaparece do
+     outro lado antes de sair de vista */
+  .tool-track{position:absolute;left:0;right:0;top:0;}
   .tool-card{
-    width:100%;aspect-ratio:1;
-    opacity:0;transform:translateY(18px) scale(0.92);
-    animation:cardEnter .6s cubic-bezier(.2,.7,.3,1) forwards;
+    position:absolute;top:0;left:0;right:0;aspect-ratio:1;
+    opacity:0;animation:cardEnter .6s ease forwards;
     animation-delay:calc(var(--i,0) * 0.1s + 0.2s);
+    will-change:transform;
   }
-  @keyframes cardEnter{to{opacity:0.65;transform:translateY(0) scale(1);}}
+  @keyframes cardEnter{to{opacity:0.65;}}
 
-  /* continuous float: lives on the inner element so it never fights the
-     one-shot entrance transform on the card itself */
   .tool-card-inner{
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
     width:100%;height:100%;border-radius:16px;text-align:center;
     background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),inset 0 -8px 16px rgba(0,0,0,0.35);
-    animation:cardFloat 4s ease-in-out infinite;
   }
-  @keyframes cardFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
-  .tool-card:nth-child(1) .tool-card-inner{animation-duration:4s;animation-delay:0s;}
-  .tool-card:nth-child(2) .tool-card-inner{animation-duration:5.5s;animation-delay:.6s;}
-  .tool-card:nth-child(3) .tool-card-inner{animation-duration:3.5s;animation-delay:1.2s;}
-  .tool-card:nth-child(4) .tool-card-inner{animation-duration:6s;animation-delay:.3s;}
-  .tool-card:nth-child(5) .tool-card-inner{animation-duration:4.5s;animation-delay:.9s;}
-  .tool-card:nth-child(6) .tool-card-inner{animation-duration:5s;animation-delay:1.5s;}
 
   .tool-icon{
-    width:34px;height:34px;border-radius:10px;flex:0 0 auto;
+    width:44px;height:44px;border-radius:12px;flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;
-    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;
     background:rgba(185,131,255,0.16);color:var(--accent);
   }
-  .tool-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;}
+  .tool-label{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);white-space:nowrap;}
 
   @media(max-width:1000px){
     .tool-cards{display:none;}
   }
-  @media(prefers-reduced-motion:reduce){
-    .tool-track--up,.tool-track--down,.tool-card,.tool-card-inner{animation:none !important;}
-    .tool-card{opacity:0.65;transform:none;}
-  }
+  /* a esteira de ferramentas é puramente decorativa (aria-hidden) e o
+     movimento é o próprio conceito da peça, então ela roda mesmo com
+     prefers-reduced-motion ativo — as demais animações do site continuam
+     respeitando a preferência normalmente */
 
   .scroll-cue{
     position:absolute;left:50%;bottom:34px;transform:translateX(-50%);z-index:1;

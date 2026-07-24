@@ -169,7 +169,6 @@ if('IntersectionObserver' in window){
 (function(){
   var hero = document.querySelector('.hero-dark');
   var mesh = hero && hero.querySelector('.hero-mesh');
-  var scene = hero && hero.querySelector('.tool-scene');
   if(!hero || !mesh) return;
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if(window.matchMedia('(pointer: coarse)').matches) return;
@@ -185,20 +184,142 @@ if('IntersectionObserver' in window){
       mesh.style.transform = 'translate(' + (x * 24).toFixed(1) + 'px,' + (y * 24).toFixed(1) + 'px)';
       hero.style.setProperty('--mx', ((x + 0.5) * 100).toFixed(1) + '%');
       hero.style.setProperty('--my', ((y + 0.5) * 100).toFixed(1) + '%');
-      if(scene){
-        // opposite direction from the mesh, smaller range — a nearer
-        // layer drifting against the background gives a light 3D parallax
-        scene.style.setProperty('--tx', (x * -16).toFixed(1) + 'px');
-        scene.style.setProperty('--ty', (y * -16).toFixed(1) + 'px');
-      }
       rafPending = false;
     });
   });
   hero.addEventListener('pointerleave', function(){
     mesh.style.transform = 'translate(0,0)';
-    if(scene){
-      scene.style.setProperty('--tx', '0px');
-      scene.style.setProperty('--ty', '0px');
-    }
   });
+})();
+
+// esteira de ferramentas: scroll infinito de verdade — cada card tem sua
+// própria posição em JS e é reciclado (somado de volta pra "fila") assim que
+// sai da área visível, então nenhum card jamais pula de volta ao início:
+// ele reaparece do outro lado antes de qualquer um poder notar
+(function(){
+  var container = document.querySelector('.tool-cards');
+  var tracks = document.querySelectorAll('.tool-track');
+  if(!container || !tracks.length) return;
+
+  var mq = window.matchMedia('(max-width: 1000px)');
+  var SPEED = {up: 51, down: 42.5}; // px/s — equivalente às durações originais (510px em 10s/12s)
+
+  // a máscara de fade de .tool-cards fica sobre um elemento com transform 3D
+  // (perspective + rotateX + rotate), então translateY local não mapeia
+  // linearmente para posição na tela — em vez de supor um valor de buffer
+  // fixo, medimos de fato (opacidade real, via getBoundingClientRect) onde
+  // cada trilha fica totalmente invisível, tanto saindo por cima quanto
+  // entrando por baixo, e usamos esses pontos calibrados para reciclar
+  function xOpacity(xpx){ return xpx<=200?0: xpx>=320?1: (xpx-200)/120; }
+  function yOpacity(ypx, H){
+    var bottomFlat = H*0.84;
+    if(ypx<=200) return 0;
+    if(ypx<300) return (ypx-200)/100;
+    if(ypx<=bottomFlat) return 1;
+    if(ypx<H) return (H-ypx)/(H-bottomFlat);
+    return 0;
+  }
+  function opacityAt(card, y){
+    card.style.transform = 'translateY(' + y + 'px)';
+    var cRect = container.getBoundingClientRect();
+    var r = card.getBoundingClientRect();
+    var H = cRect.height;
+    if(r.right < cRect.left || r.left > cRect.right || r.bottom < cRect.top || r.top > cRect.bottom) return 0;
+    var op = 1;
+    if(r.left < cRect.left) op = Math.min(op, xOpacity(r.right - cRect.left));
+    if(r.top < cRect.top) op = Math.min(op, yOpacity(r.bottom - cRect.top, H));
+    if(r.bottom > cRect.bottom) op = Math.min(op, yOpacity(r.top - cRect.top, H));
+    return op;
+  }
+  function calibrate(card){
+    var topExit = -800, bottomEntry = 3000;
+    for(var y = 0; y >= -2000; y -= 20){
+      if(opacityAt(card, y) <= 0.01){ topExit = y; break; }
+    }
+    for(var y2 = 0; y2 <= 5000; y2 += 25){
+      if(opacityAt(card, y2) <= 0.01){ bottomEntry = y2; break; }
+    }
+    return {topExit: topExit - 60, bottomEntry: bottomEntry + 60}; // margem extra de segurança
+  }
+
+  var lanes = [];
+  Array.prototype.forEach.call(tracks, function(track){
+    var templates = Array.prototype.slice.call(track.querySelectorAll('.tool-card'));
+    if(!templates.length) return;
+    var dir = track.classList.contains('tool-track--down') ? 1 : -1;
+    lanes.push({
+      track: track, templates: templates, cards: [], dir: dir,
+      speed: dir === 1 ? SPEED.down : SPEED.up,
+      step: 0, topExit: 0, bottomEntry: 0, y: []
+    });
+  });
+  if(!lanes.length) return;
+
+  // o vão entre "invisível saindo por cima" e "invisível entrando por baixo"
+  // é maior do que os 3 cards únicos cobrem no espaçamento apertado original
+  // — clonamos o conjunto exatamente o número de vezes necessário pra cobrir
+  // o vão (nem menos, o que deixa buraco sem card nenhum, nem mais, o que
+  // sobrepõe cards na emenda do loop)
+  function rebuildCards(lane, count){
+    lane.track.querySelectorAll('.tool-card[data-tc-clone]').forEach(function(n){ n.remove(); });
+    var list = lane.templates.slice();
+    while(list.length < count){
+      var tpl = lane.templates[list.length % lane.templates.length];
+      var clone = tpl.cloneNode(true);
+      clone.setAttribute('data-tc-clone', '1');
+      clone.style.setProperty('--i', list.length % lane.templates.length);
+      lane.track.appendChild(clone);
+      list.push(clone);
+    }
+    lane.cards = list;
+  }
+
+  function measure(){
+    // as duas colunas usam o MESMO espaçamento (independente de quantos
+    // cards cada uma acaba precisando para cobrir seu próprio vão) — sem
+    // isso, colunas com vãos calibrados ligeiramente diferentes acabavam
+    // com espaçamentos visivelmente diferentes entre si
+    var targetStep = lanes[0].templates[0].offsetHeight + 20; // altura do card + os 20px de espaçamento original
+
+    lanes.forEach(function(lane){
+      lane.step = targetStep;
+      var bounds = calibrate(lane.templates[0]);
+      lane.topExit = bounds.topExit;
+      lane.bottomEntry = bounds.bottomEntry;
+      var span = lane.bottomEntry - lane.topExit;
+      var count = Math.max(lane.templates.length, Math.ceil(span / targetStep) + 1);
+      // o "pool" de reciclagem é sempre um múltiplo exato do step
+      // compartilhado — assim, ao reaparecer do outro lado, o card cai
+      // exatamente na mesma grade de espaçamento, sem nenhuma costura
+      // menor que as demais (o bug de sobreposição da vez passada)
+      lane.pool = count * targetStep;
+      rebuildCards(lane, count);
+      lane.y = [];
+      lane.cards.forEach(function(card, i){
+        lane.y[i] = lane.topExit + i * lane.step;
+        card.style.transform = 'translateY(' + lane.y[i].toFixed(1) + 'px)';
+      });
+    });
+  }
+  measure();
+  window.addEventListener('resize', measure);
+
+  var last = performance.now();
+  function frame(now){
+    var dt = (now - last) / 1000;
+    last = now;
+    if(!mq.matches){
+      if(dt > 0.1) dt = 0.1; // evita saltos grandes ao voltar de uma aba em segundo plano
+      lanes.forEach(function(lane){
+        for(var i = 0; i < lane.cards.length; i++){
+          lane.y[i] += lane.dir * lane.speed * dt;
+          if(lane.dir === -1 && lane.y[i] < lane.topExit) lane.y[i] += lane.pool;
+          if(lane.dir === 1 && lane.y[i] > lane.bottomEntry) lane.y[i] -= lane.pool;
+          lane.cards[i].style.transform = 'translateY(' + lane.y[i].toFixed(1) + 'px)';
+        }
+      });
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 })();
